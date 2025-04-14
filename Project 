@@ -1,0 +1,451 @@
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyNxEIROIk3dDyMMeUwmumZg",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/JamshedQasim/Neural-Network/blob/main/Project%20\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import matplotlib.pyplot as plt\n",
+        "import numpy as np\n",
+        "import PIL\n",
+        "import tensorflow as tf\n",
+        "\n",
+        "from tensorflow import keras\n",
+        "from tensorflow.keras import layers\n",
+        "from tensorflow.keras.models import Sequential"
+      ],
+      "metadata": {
+        "id": "2Vak-3MJioVa"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from google.colab import drive\n",
+        "drive.mount('/content/drive')\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "E04JQaKRow27",
+        "outputId": "6a3a5f68-69a4-4ccb-9cc8-1fba50b481f5"
+      },
+      "execution_count": 28,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Drive already mounted at /content/drive; to attempt to forcibly remount, call drive.mount(\"/content/drive\", force_remount=True).\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Path to your dataset folder on Google Drive\n",
+        "train_directory = '/content/drive/MyDrive/archive'\n",
+        "\n",
+        "# Verify if the directory exists\n",
+        "import os\n",
+        "if os.path.exists(train_directory):\n",
+        "    print(f\"Directory found: {train_directory}\")\n",
+        "else:\n",
+        "    print(f\"Directory not found: {train_directory}\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "a0FOd4eco0OP",
+        "outputId": "8c1bcbf0-89a5-427e-a3cb-4e263383fc5f"
+      },
+      "execution_count": 29,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Directory found: /content/drive/MyDrive/archive\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "img_height, img_width = 180, 180 #adjust based on your image dimension\n",
+        "train_ds = tf.keras.preprocessing.image_dataset_from_directory(\n",
+        "    train_directory,\n",
+        "    labels='inferred',\n",
+        "    label_mode='int',\n",
+        "    image_size=(img_height, img_width),\n",
+        "    interpolation='nearest',\n",
+        "    batch_size=32, #adjust based on your machine capability\n",
+        "    shuffle=True\n",
+        ")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "NsEQGBd-pYvG",
+        "outputId": "f8181480-fa3e-4726-cfc5-30e4d93502ea"
+      },
+      "execution_count": 30,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Found 3670 files belonging to 2 classes.\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "**Preprocess the flower dataset(resize, normalized and augment image)**"
+      ],
+      "metadata": {
+        "id": "6W0ThYj4IIyb"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import tensorflow as tf\n",
+        "import tensorflow_datasets as tfds\n",
+        "from tensorflow.keras import layers\n",
+        "\n",
+        "# Download the flower dataset from TensorFlow Datasets\n",
+        "dataset, info = tfds.load('tf_flowers', with_info=True, as_supervised=True)\n",
+        "\n",
+        "# Check available splits (to confirm the available splits)\n",
+        "print(info.splits)\n",
+        "\n",
+        "# Split the dataset into training and validation datasets (if only 'train' split is available)\n",
+        "train_ds = dataset['train']\n",
+        "\n",
+        "# Manually split the 'train' dataset into training and validation sets\n",
+        "val_size = 0.2  # 20% for validation\n",
+        "train_size = 1 - val_size\n",
+        "\n",
+        "train_ds = train_ds.take(int(len(train_ds) * train_size))  # Take 80% for training\n",
+        "val_ds = train_ds.skip(int(len(train_ds) * train_size))    # Take 20% for validation\n",
+        "\n",
+        "# Preprocessing function (resize and normalize)\n",
+        "def preprocess(image, label):\n",
+        "    # Resize images to 180x180\n",
+        "    image = tf.image.resize(image, (180, 180))\n",
+        "    # Normalize images to [0, 1]\n",
+        "    image = image / 255.0\n",
+        "    return image, label\n",
+        "\n",
+        "# Data Augmentation function (random transformations)\n",
+        "def augment(image, label):\n",
+        "    # Randomly flip images horizontally\n",
+        "    image = tf.image.random_flip_left_right(image)\n",
+        "    # Randomly adjust the brightness of images\n",
+        "    image = tf.image.random_brightness(image, max_delta=0.2)\n",
+        "    # Randomly adjust the contrast of images\n",
+        "    image = tf.image.random_contrast(image, lower=0.8, upper=1.2)\n",
+        "    # Randomly adjust the saturation of images\n",
+        "    image = tf.image.random_saturation(image, lower=0.8, upper=1.2)\n",
+        "    return image, label\n",
+        "\n",
+        "# Apply preprocessing and augmentation to the train dataset\n",
+        "train_ds = train_ds.map(preprocess)  # Apply resize and normalize\n",
+        "train_ds = train_ds.map(augment)    # Apply data augmentation\n",
+        "train_ds = train_ds.batch(32)       # Batch the dataset (32 images at a time)\n",
+        "train_ds = train_ds.shuffle(1000)   # Shuffle the training dataset\n",
+        "train_ds = train_ds.prefetch(tf.data.experimental.AUTOTUNE)  # Prefetch for performance optimization\n",
+        "\n",
+        "# Apply preprocessing to the validation dataset (no augmentation for validation data)\n",
+        "val_ds = val_ds.map(preprocess)\n",
+        "val_ds = val_ds.batch(32)\n",
+        "val_ds = val_ds.prefetch(tf.data.experimental.AUTOTUNE)\n",
+        "\n",
+        "# Now train_ds and val_ds are ready for model training\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "_IGhdrUBpttI",
+        "outputId": "93ec9473-e795-442e-d1bb-908fc45ca487"
+      },
+      "execution_count": 38,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "{'train': <SplitInfo num_examples=3670, num_shards=2>}\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "**classical ML models (SVM, Decision Tree, Random Forest) for classification.**"
+      ],
+      "metadata": {
+        "id": "EeDzCQXBIrL6"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "import tensorflow as tf\n",
+        "import tensorflow_datasets as tfds\n",
+        "import numpy as np\n",
+        "from sklearn.svm import SVC\n",
+        "from sklearn.tree import DecisionTreeClassifier\n",
+        "from sklearn.ensemble import RandomForestClassifier\n",
+        "from sklearn.metrics import accuracy_score\n",
+        "from sklearn.model_selection import train_test_split\n",
+        "from sklearn.preprocessing import StandardScaler\n",
+        "\n",
+        "# Download the flower dataset from TensorFlow Datasets\n",
+        "dataset, info = tfds.load('tf_flowers', with_info=True, as_supervised=True)\n",
+        "\n",
+        "# Extract the training dataset\n",
+        "train_ds = dataset['train']\n",
+        "\n",
+        "# Preprocessing function (resize and normalize)\n",
+        "def preprocess(image, label):\n",
+        "    # Resize images to 180x180\n",
+        "    image = tf.image.resize(image, (180, 180))\n",
+        "    # Normalize images to [0, 1]\n",
+        "    image = image / 255.0\n",
+        "    return image, label\n",
+        "\n",
+        "# Apply preprocessing to the train dataset\n",
+        "train_ds = train_ds.map(preprocess)\n",
+        "train_ds = train_ds.batch(32).prefetch(tf.data.experimental.AUTOTUNE)\n",
+        "\n",
+        "# Convert the dataset into numpy arrays for classical ML models\n",
+        "images = []\n",
+        "labels = []\n",
+        "\n",
+        "for image, label in train_ds:\n",
+        "    images.append(image.numpy())\n",
+        "    labels.append(label.numpy())\n",
+        "\n",
+        "# Convert lists to numpy arrays\n",
+        "X = np.concatenate(images, axis=0)\n",
+        "y = np.concatenate(labels, axis=0)\n",
+        "\n",
+        "# Flatten the images for classical ML models (1D vector)\n",
+        "X_flattened = X.reshape(X.shape[0], -1)  # Flatten images into 1D vectors\n",
+        "\n",
+        "# Normalize the feature matrix (important for SVM)\n",
+        "scaler = StandardScaler()\n",
+        "X_scaled = scaler.fit_transform(X_flattened)\n",
+        "\n",
+        "# Split data into train and test sets\n",
+        "X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)\n",
+        "\n",
+        "# ---------------------------------------\n",
+        "# SVM Model\n",
+        "svm = SVC(kernel='linear')  # Linear SVM\n",
+        "svm.fit(X_train, y_train)\n",
+        "\n",
+        "# Make predictions and evaluate\n",
+        "y_pred_svm = svm.predict(X_test)\n",
+        "svm_accuracy = accuracy_score(y_test, y_pred_svm)\n",
+        "print(f\"SVM Model Accuracy: {svm_accuracy:.4f}\")\n",
+        "\n",
+        "# ---------------------------------------\n",
+        "# Decision Tree Model\n",
+        "dt = DecisionTreeClassifier(random_state=42)\n",
+        "dt.fit(X_train, y_train)\n",
+        "\n",
+        "# Make predictions and evaluate\n",
+        "y_pred_dt = dt.predict(X_test)\n",
+        "dt_accuracy = accuracy_score(y_test, y_pred_dt)\n",
+        "print(f\"Decision Tree Model Accuracy: {dt_accuracy:.4f}\")\n",
+        "\n",
+        "# ---------------------------------------\n",
+        "# Random Forest Model\n",
+        "rf = RandomForestClassifier(n_estimators=100, random_state=42)\n",
+        "rf.fit(X_train, y_train)\n",
+        "\n",
+        "# Make predictions and evaluate\n",
+        "y_pred_rf = rf.predict(X_test)\n",
+        "rf_accuracy = accuracy_score(y_test, y_pred_rf)\n",
+        "print(f\"Random Forest Model Accuracy: {rf_accuracy:.4f}\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "OE8X5pfLuYSt",
+        "outputId": "3d32ec91-ccd5-43b5-aab6-4a452b39e34c"
+      },
+      "execution_count": 39,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "SVM Model Accuracy: 0.4537\n",
+            "Decision Tree Model Accuracy: 0.3583\n",
+            "Random Forest Model Accuracy: 0.5204\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "**Compare performance metrics (accuracy, precision, recall).**"
+      ],
+      "metadata": {
+        "id": "hZye73-qI6Zi"
+      }
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report\n",
+        "\n",
+        "# SVM Model\n",
+        "svm = SVC(kernel='linear')\n",
+        "svm.fit(X_train, y_train)\n",
+        "\n",
+        "# Predictions for SVM\n",
+        "y_pred_svm = svm.predict(X_test)\n",
+        "\n",
+        "# Calculate metrics for SVM\n",
+        "accuracy_svm = accuracy_score(y_test, y_pred_svm)\n",
+        "precision_svm = precision_score(y_test, y_pred_svm, average='weighted', zero_division=1)\n",
+        "recall_svm = recall_score(y_test, y_pred_svm, average='weighted', zero_division=1)\n",
+        "\n",
+        "print(f\"SVM Model - Accuracy: {accuracy_svm:.4f}, Precision: {precision_svm:.4f}, Recall: {recall_svm:.4f}\")\n",
+        "print(f\"Classification Report for SVM:\\n{classification_report(y_test, y_pred_svm)}\")\n",
+        "\n",
+        "# ---------------------------------------\n",
+        "# Decision Tree Model\n",
+        "dt = DecisionTreeClassifier(random_state=42)\n",
+        "dt.fit(X_train, y_train)\n",
+        "\n",
+        "# Predictions for Decision Tree\n",
+        "y_pred_dt = dt.predict(X_test)\n",
+        "\n",
+        "# Calculate metrics for Decision Tree\n",
+        "accuracy_dt = accuracy_score(y_test, y_pred_dt)\n",
+        "precision_dt = precision_score(y_test, y_pred_dt, average='weighted', zero_division=1)\n",
+        "recall_dt = recall_score(y_test, y_pred_dt, average='weighted', zero_division=1)\n",
+        "\n",
+        "print(f\"Decision Tree Model - Accuracy: {accuracy_dt:.4f}, Precision: {precision_dt:.4f}, Recall: {recall_dt:.4f}\")\n",
+        "print(f\"Classification Report for Decision Tree:\\n{classification_report(y_test, y_pred_dt)}\")\n",
+        "\n",
+        "# ---------------------------------------\n",
+        "# Random Forest Model\n",
+        "rf = RandomForestClassifier(n_estimators=100, random_state=42)\n",
+        "rf.fit(X_train, y_train)\n",
+        "\n",
+        "# Predictions for Random Forest\n",
+        "y_pred_rf = rf.predict(X_test)\n",
+        "\n",
+        "# Calculate metrics for Random Forest\n",
+        "accuracy_rf = accuracy_score(y_test, y_pred_rf)\n",
+        "precision_rf = precision_score(y_test, y_pred_rf, average='weighted', zero_division=1)\n",
+        "recall_rf = recall_score(y_test, y_pred_rf, average='weighted', zero_division=1)\n",
+        "\n",
+        "print(f\"Random Forest Model - Accuracy: {accuracy_rf:.4f}, Precision: {precision_rf:.4f}, Recall: {recall_rf:.4f}\")\n",
+        "print(f\"Classification Report for Random Forest:\\n{classification_report(y_test, y_pred_rf)}\")\n"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "Y34ZspyJ8IKf",
+        "outputId": "5085d594-a5c3-424c-d5bf-740fa61e6c81"
+      },
+      "execution_count": 40,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "SVM Model - Accuracy: 0.4537, Precision: 0.4652, Recall: 0.4537\n",
+            "Classification Report for SVM:\n",
+            "              precision    recall  f1-score   support\n",
+            "\n",
+            "           0       0.42      0.69      0.52       185\n",
+            "           1       0.32      0.20      0.25       125\n",
+            "           2       0.39      0.33      0.36       143\n",
+            "           3       0.68      0.46      0.55       156\n",
+            "           4       0.51      0.49      0.50       125\n",
+            "\n",
+            "    accuracy                           0.45       734\n",
+            "   macro avg       0.46      0.43      0.43       734\n",
+            "weighted avg       0.47      0.45      0.44       734\n",
+            "\n",
+            "Decision Tree Model - Accuracy: 0.3583, Precision: 0.3654, Recall: 0.3583\n",
+            "Classification Report for Decision Tree:\n",
+            "              precision    recall  f1-score   support\n",
+            "\n",
+            "           0       0.46      0.41      0.43       185\n",
+            "           1       0.29      0.30      0.30       125\n",
+            "           2       0.29      0.30      0.29       143\n",
+            "           3       0.43      0.38      0.41       156\n",
+            "           4       0.30      0.37      0.33       125\n",
+            "\n",
+            "    accuracy                           0.36       734\n",
+            "   macro avg       0.36      0.35      0.35       734\n",
+            "weighted avg       0.37      0.36      0.36       734\n",
+            "\n",
+            "Random Forest Model - Accuracy: 0.5204, Precision: 0.5292, Recall: 0.5204\n",
+            "Classification Report for Random Forest:\n",
+            "              precision    recall  f1-score   support\n",
+            "\n",
+            "           0       0.57      0.65      0.61       185\n",
+            "           1       0.60      0.46      0.52       125\n",
+            "           2       0.38      0.47      0.42       143\n",
+            "           3       0.62      0.56      0.59       156\n",
+            "           4       0.46      0.38      0.42       125\n",
+            "\n",
+            "    accuracy                           0.52       734\n",
+            "   macro avg       0.53      0.51      0.51       734\n",
+            "weighted avg       0.53      0.52      0.52       734\n",
+            "\n"
+          ]
+        }
+      ]
+    }
+  ]
+}
